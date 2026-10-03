@@ -1,0 +1,18 @@
+# ~/pihole/compose.yaml
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    hostname: pihole
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "8053:80/tcp"       # Web-UI, Port 80 ist durch Caddy belegt
+    environment:
+      TZ: Europe/Berlin
+      FTLCONF_webserver_api_password: ${WEBSERVER_API_PASSWORD:?Passwort fehlt in .env}
+      FTLCONF_dns_upstreams: "1.1.1.1;9.9.9.9"
+      FTLCONF_dns_listeningMode: all
+    volumes:
+      - ./etc-pihole:/etc/pihole
+    restart: unless-stopped
