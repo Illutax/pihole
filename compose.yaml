@@ -1,7 +1,7 @@
 # ~/pihole/compose.yaml
 services:
   pihole:
-    image: pihole/pihole:2026.09.0
+    image: pihole/pihole:2026.07.2
     container_name: pihole
     hostname: pihole
     ports:
