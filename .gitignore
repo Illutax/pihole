@@ -1,2 +1,4 @@
 .env
 etc-pihole
+update.log
+.update.lock
