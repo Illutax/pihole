@@ -13,6 +13,7 @@ services:
       FTLCONF_webserver_api_password: ${WEBSERVER_API_PASSWORD:?Passwort fehlt in .env}
       FTLCONF_dns_upstreams: "1.1.1.1;9.9.9.9"
       FTLCONF_dns_listeningMode: all
+      FTLCONF_dns_revServers: "true,192.168.178.0/24,192.168.178.1,fritz.box" # conditional forwarding for intranet -> ignore it, because alias would stop working otherwise
     volumes:
       - ./etc-pihole:/etc/pihole
     restart: unless-stopped
