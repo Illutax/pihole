@@ -148,6 +148,7 @@ NEW_TAG=$(latest_tag)
 
 if [[ "$NEW_TAG" == "$OLD_TAG" ]]; then
     info "Bereits aktuell ($OLD_TAG), nichts zu tun."
+    notify "Pihole Aktualisierung gelaufen" "Aber nichts neues steht bereit (${OLD_TAG})" default +1
     exit 0
 fi
 if [[ "$(printf '%s\n%s\n' "$OLD_TAG" "$NEW_TAG" | sort -V | tail -1)" != "$NEW_TAG" ]]; then
