@@ -14,6 +14,11 @@
 set -u -o pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# Secrets & lokale Overrides (NTFY_URL, NTFY_TOKEN, ...) – nicht im Git
+ENV_FILE="${ENV_FILE:-$HOME/.config/pihole-update.env}"
+# shellcheck disable=SC1090
+[[ -r "$ENV_FILE" ]] && source "$ENV_FILE"
+
 # ---------------------------------------------------------------- Konfiguration
 PIHOLE_DIR="${PIHOLE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 COMPOSE_FILE="${COMPOSE_FILE:-compose.yaml}"
@@ -25,6 +30,7 @@ TEST_DOMAIN_OK="${TEST_DOMAIN_OK:-heise.de}"
 TEST_DOMAIN_BLOCKED="${TEST_DOMAIN_BLOCKED:-doubleclick.net}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"     # Sekunden bis Container healthy sein muss
 NTFY_URL="${NTFY_URL:-}"                    # optional, z.B. https://ntfy.sh/mein-topic
+NTFY_TOKEN="${NTFY_TOKEN:-}"                # Token eines Nutzers mit Schreibrecht auf das Topic
 GIT_PUSH="${GIT_PUSH:-true}"
 TAG_REGEX='^[0-9]{4}\.[0-9]{2}\.[0-9]+$'    # nur Release-Tags wie 2026.09.1
 
@@ -35,16 +41,18 @@ warn() { log WARN "$*"; }
 err()  { log ERROR "$*"; }
 
 notify() {
-    local title="$1" msg="$2" prio="${3:-default}"
+    local title="$1" msg="$2" prio="${3:-default}" tags="${4:-}"
     [[ -n "$NTFY_URL" ]] || return 0
-    curl -fsS --max-time 10 \
-        -H "Title: $title" -H "Priority: $prio" \
+    local -a auth=()
+    [[ -n "$NTFY_TOKEN" ]] && auth=(-H "Authorization: Bearer $NTFY_TOKEN")
+    curl -fsS --max-time 10 "${auth[@]}" \
+        -H "Title: $title" -H "Priority: $prio" -H "Tags: $tags" \
         -d "$msg" "$NTFY_URL" >/dev/null 2>&1 || warn "ntfy-Benachrichtigung fehlgeschlagen"
 }
 
 die() {
     err "$*"
-    notify "Pi-hole Update abgebrochen" "$*" high
+    notify "Pi-hole Update abgebrochen" "$*" high warning
     exit 1
 }
 
@@ -120,6 +128,15 @@ for bin in curl jq dig git docker flock; do
     command -v "$bin" >/dev/null || die "Benötigtes Programm fehlt: $bin"
 done
 [[ -f "$COMPOSE_FILE" ]] || die "$COMPOSE_FILE nicht gefunden"
+
+# ./pihole-update.sh --test  → nur Benachrichtigung und Tests prüfen, nichts ändern
+if [[ "${1:-}" == "--test" ]]; then
+    info "Testmodus: sende Probe-Benachrichtigung und führe Tests aus"
+    [[ -n "$NTFY_URL" ]] || warn "NTFY_URL nicht gesetzt (ENV_FILE: $ENV_FILE)"
+    notify "Pi-hole Update: Test" "Benachrichtigung funktioniert. Tag: $(current_tag)" low test_tube
+    run_tests && info "Alle Tests OK" || die "Tests fehlgeschlagen"
+    exit 0
+fi
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$PIHOLE_DIR ist kein Git-Repository"
 
 OLD_TAG=$(current_tag)
@@ -195,7 +212,7 @@ if run_tests; then
                 info "Push erfolgreich"
             else
                 warn "git push fehlgeschlagen — Commit liegt lokal vor"
-                notify "Pi-hole aktualisiert, Push fehlgeschlagen" "$OLD_TAG -> $NEW_TAG läuft, aber git push schlug fehl." default
+                notify "Pi-hole aktualisiert, Push fehlgeschlagen" "$OLD_TAG -> $NEW_TAG läuft, aber git push schlug fehl." default warning
             fi
         fi
     else
@@ -204,7 +221,7 @@ if run_tests; then
 
     rm -rf "$BACKUP_DIR"
     docker image rm -f "${IMAGE_REPO}:${OLD_TAG}" >/dev/null 2>&1 || true
-    notify "Pi-hole aktualisiert" "$OLD_TAG -> $NEW_TAG, alle Tests bestanden." low
+    notify "Pi-hole aktualisiert" "$OLD_TAG -> $NEW_TAG, alle Tests bestanden." low white_check_mark
     exit 0
 fi
 
@@ -221,10 +238,10 @@ dc up -d --remove-orphans
 
 if run_tests; then
     warn "Rollback auf $OLD_TAG erfolgreich, Pi-hole läuft wieder. Backup bleibt unter $BACKUP_DIR"
-    notify "Pi-hole Update FEHLGESCHLAGEN, Rollback ok" "Update $OLD_TAG -> $NEW_TAG hat die Tests nicht bestanden. Läuft wieder auf $OLD_TAG. Logs in $BACKUP_DIR und im Cron-Log." high
+    notify "Pi-hole Update FEHLGESCHLAGEN, Rollback ok" "Update $OLD_TAG -> $NEW_TAG hat die Tests nicht bestanden. Läuft wieder auf $OLD_TAG. Logs in $BACKUP_DIR und im Cron-Log." high rotating_light
     exit 1
 fi
 
 err "ROLLBACK FEHLGESCHLAGEN — Pi-hole ist nicht funktionsfähig, manuelles Eingreifen nötig!"
-notify "Pi-hole DOWN nach fehlgeschlagenem Rollback" "Weder $NEW_TAG noch $OLD_TAG laufen. Backup unter $BACKUP_DIR. DNS im Heimnetz ist aktuell gestört!" urgent
+notify "Pi-hole DOWN nach fehlgeschlagenem Rollback" "Weder $NEW_TAG noch $OLD_TAG laufen. Backup unter $BACKUP_DIR. DNS im Heimnetz ist aktuell gestört!" urgent sos
 exit 2
