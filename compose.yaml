@@ -1,4 +1,9 @@
 # ~/pihole/compose.yaml
+networks:
+  webserver:
+    name: webserver
+    external: true
+
 services:
   pihole:
     image: pihole/pihole:2026.10.0
@@ -10,11 +15,15 @@ services:
 #      - "80:80/tcp"       # Web-UI, Port 80 ist durch Caddy belegt, wird aber auch geproxied
     environment:
       TZ: Europe/Berlin
+      FTLCONF_webserver_domain: "pihole.ws.internal"
+      FTLCONF_misc_dnsmasq_lines: "address=/ws.internal/192.168.178.146"
       FTLCONF_webserver_api_password: ${WEBSERVER_API_PASSWORD:?Passwort fehlt in .env}
       FTLCONF_dns_hosts: "192.168.178.146 ${DNS_HOST:?Hostname fehlt in env}"
       FTLCONF_dns_upstreams: "1.1.1.1;9.9.9.9"
       FTLCONF_dns_listeningMode: all
       FTLCONF_dns_revServers: "true,192.168.178.0/24,192.168.178.1,fritz.box" # conditional forwarding for intranet -> ignore it, because alias would stop working otherwise
+    networks:
+      - webserver
     volumes:
       - ./etc-pihole:/etc/pihole
     restart: unless-stopped
