@@ -7,7 +7,7 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      - "8053:80/tcp"       # Web-UI, Port 80 ist durch Caddy belegt
+#      - "80:80/tcp"       # Web-UI, Port 80 ist durch Caddy belegt, wird aber auch geproxied
     environment:
       TZ: Europe/Berlin
       FTLCONF_webserver_api_password: ${WEBSERVER_API_PASSWORD:?Passwort fehlt in .env}

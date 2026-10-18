@@ -15,7 +15,7 @@ set -u -o pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Secrets & lokale Overrides (NTFY_URL, NTFY_TOKEN, ...) – nicht im Git
-ENV_FILE="${ENV_FILE:-$HOME/.config/pihole-update.env}"
+ENV_FILE="${ENV_FILE:-$HOME/.config/ntfy-pihole.env}"
 # shellcheck disable=SC1090
 [[ -r "$ENV_FILE" ]] && source "$ENV_FILE"
 
